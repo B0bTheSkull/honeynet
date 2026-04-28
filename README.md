@@ -157,6 +157,23 @@ Most Common Credentials Attempted:
 
 ---
 
+## MITRE ATT&CK Coverage
+
+HoneyNet's decoys capture attacker behavior across these techniques. Every event in `logs/honeynet.json` is real adversary activity that maps to a documented technique — useful as both training data for detection rules and as evidence for threat intel reporting.
+
+| Honeypot Activity | Tactic | Technique |
+|---|---|---|
+| SSH credential attempts | Credential Access | [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/) |
+| FTP credential attempts | Credential Access | [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/) |
+| HTTP login attempts | Credential Access | [T1110 — Brute Force](https://attack.mitre.org/techniques/T1110/) |
+| Shell commands typed by attacker | Execution | [T1059.004 — Unix Shell](https://attack.mitre.org/techniques/T1059/004/) |
+| `whoami`, `id` | Discovery | [T1033 — System Owner/User Discovery](https://attack.mitre.org/techniques/T1033/) |
+| `cat /etc/passwd`, account enumeration | Discovery | [T1087.001 — Local Account Discovery](https://attack.mitre.org/techniques/T1087/001/) |
+| HTTP sensitive file probes (`.env`, `.git`) | Discovery | [T1083 — File and Directory Discovery](https://attack.mitre.org/techniques/T1083/) |
+| Coordinated multi-service scanning | Reconnaissance | [T1595 — Active Scanning](https://attack.mitre.org/techniques/T1595/) |
+
+---
+
 ## Roadmap
 
 - [ ] Email/Slack alerting on high-value events
