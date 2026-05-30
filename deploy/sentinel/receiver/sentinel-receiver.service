@@ -1,0 +1,26 @@
+[Unit]
+Description=Sentinel receiver — Pi-side endpoint for HoneyNet alerts
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=/etc/sentinel-receiver.env
+ExecStart=/usr/bin/python3 /opt/sentinel/sentinel_receiver.py
+Restart=always
+RestartSec=5
+
+# Hardening: only needs to read its script and append to the alert log.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/pi/sentinel
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
