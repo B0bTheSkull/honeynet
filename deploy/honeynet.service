@@ -1,0 +1,35 @@
+[Unit]
+Description=HoneyNet honeypot framework (SSH/HTTP/FTP decoys)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=honeynet
+Group=honeynet
+WorkingDirectory=/opt/honeynet
+ExecStart=/opt/honeynet/venv/bin/python /opt/honeynet/honeynet.py --config /opt/honeynet/config.yaml
+Restart=always
+RestartSec=5
+
+# --- Hardening --------------------------------------------------------------
+# The honeypot is deliberately exposed; lock down everything the app itself
+# does not need so a bug in a decoy can't be used to pivot into the host.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/honeynet/logs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# Allow binding low ports (only needed if you remap decoys to 22/21/80)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

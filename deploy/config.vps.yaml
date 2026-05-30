@@ -1,0 +1,28 @@
+# HoneyNet config for a real internet-facing VPS deployment.
+#
+# Decoys bind the REAL service ports (22/80/21) for maximum hit rate. This is
+# only safe because deploy/setup-vps.sh moves your real admin sshd to 64022
+# first. Never apply this on a host where 22/80/21 are doing real work.
+#
+# Copy to /opt/honeynet/config.yaml once you've confirmed admin SSH on 64022:
+#     sudo cp deploy/config.vps.yaml /opt/honeynet/config.yaml
+#     sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 21/tcp
+#     sudo systemctl restart honeynet
+
+log_file: "logs/honeynet.json"
+
+honeypots:
+  ssh:
+    enabled: true
+    port: 22
+    banner: "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
+  http:
+    enabled: true
+    port: 80
+  ftp:
+    enabled: true
+    port: 21
+    banner: "220 ProFTPD Server ready"
+
+alerts:
+  multi_service_window: 60  # seconds — same IP hitting 2+ decoys = coordinated scan

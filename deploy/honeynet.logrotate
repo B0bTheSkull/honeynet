@@ -1,0 +1,13 @@
+# /etc/logrotate.d/honeynet
+# Keep the JSON event log from growing unbounded on a long-running sensor.
+# HoneyNet appends NDJSON; copytruncate lets it keep writing the same fd.
+/opt/honeynet/logs/honeynet.json {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su honeynet honeynet
+}
