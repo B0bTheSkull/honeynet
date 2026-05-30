@@ -143,6 +143,9 @@ class SSHHoneypot:
         while True:
             try:
                 client, addr = sock.accept()
+            except Exception:
+                break  # listener socket is dead; let systemd restart us
+            try:
                 self.logger.log("SSH", addr[0], addr[1], "connection", {"port": self.port})
                 t = threading.Thread(
                     target=_handle_client,
@@ -151,4 +154,4 @@ class SSHHoneypot:
                 )
                 t.start()
             except Exception:
-                break
+                continue  # one bad connection must never take down the decoy

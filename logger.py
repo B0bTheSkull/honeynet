@@ -21,6 +21,8 @@ class HoneyLogger:
         self.multi_service_window = multi_service_window
         # ip -> {service -> timestamp}
         self.ip_service_hits = defaultdict(dict)
+        # IPs already flagged as coordinated, so we alert once instead of per packet
+        self.alerted_ips = set()
 
     def log(self, honeypot_type, source_ip, source_port, event_type, details=None):
         event = {
@@ -32,13 +34,15 @@ class HoneyLogger:
             "details": details or {}
         }
 
+        self._write(event)
+        self._check_multi_service(honeypot_type, source_ip)
+        return event
+
+    def _write(self, event):
         with self.lock:
             with open(self.log_file, "a") as f:
                 f.write(json.dumps(event) + "\n")
-
         self._print_event(event)
-        self._check_multi_service(honeypot_type, source_ip)
-        return event
 
     def _print_event(self, event):
         ts = event["timestamp"][11:19]
@@ -56,6 +60,14 @@ class HoneyLogger:
         print(f"{CYAN}[{ts}]{RESET} {YELLOW}[{hp}]{RESET} {BOLD}{src}{RESET}:{event['source_port']} → {etype}{cred_str}")
 
     def _check_multi_service(self, honeypot_type, source_ip):
+        # SYSTEM rows are synthetic (e.g. the coordinated_scan alert we emit
+        # below); they are not attacker activity and must never feed detection.
+        # Counting them also caused infinite recursion: emitting a SYSTEM alert
+        # re-entered this method, re-tripped the >=2 check, and recursed until
+        # RecursionError tore down the SSH/FTP listener threads.
+        if honeypot_type == "SYSTEM":
+            return
+
         now = time.time()
         self.ip_service_hits[source_ip][honeypot_type] = now
 
@@ -66,7 +78,9 @@ class HoneyLogger:
         }
 
         services_hit = set(self.ip_service_hits[source_ip].keys())
-        if len(services_hit) >= 2:
+        # Alert once per IP, not on every subsequent packet from a flagged scanner.
+        if len(services_hit) >= 2 and source_ip not in self.alerted_ips:
+            self.alerted_ips.add(source_ip)
             print(f"\n{RED}{BOLD}[!] COORDINATED SCAN DETECTED{RESET}")
             print(f"    {source_ip} hit {len(services_hit)} honeypot services: {', '.join(services_hit)}")
             print(f"    This indicates automated multi-service scanning.\n")

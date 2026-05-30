@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the HoneyNet -> Sentinel writeup watcher every 10 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+# Spread load / avoid exact-minute thundering herd
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

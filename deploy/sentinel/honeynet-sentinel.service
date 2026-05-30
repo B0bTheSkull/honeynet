@@ -1,0 +1,24 @@
+[Unit]
+Description=HoneyNet -> Sentinel writeup-worthy watcher (one-shot, run by timer)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Secrets (webhook URL + token) live here, root-only, NOT in the repo.
+EnvironmentFile=/etc/honeynet-sentinel.env
+ExecStart=/opt/honeynet/venv/bin/python /opt/honeynet/deploy/sentinel/writeup_watch.py
+
+# --- Hardening: this only needs to read the log and make an outbound POST ---
+User=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/honeynet-sentinel
+ReadOnlyPaths=/opt/honeynet
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=true

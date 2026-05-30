@@ -114,6 +114,9 @@ class FTPHoneypot:
         while True:
             try:
                 conn, addr = sock.accept()
+            except Exception:
+                break  # listener socket is dead; let systemd restart us
+            try:
                 self.logger.log("FTP", addr[0], addr[1], "connection", {"port": self.port})
                 t = threading.Thread(
                     target=_handle_client,
@@ -122,4 +125,4 @@ class FTPHoneypot:
                 )
                 t.start()
             except Exception:
-                break
+                continue  # one bad connection must never take down the decoy
