@@ -1,7 +1,7 @@
 """Centralized JSON event logger for HoneyNet."""
 import json
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import defaultdict
 import time
@@ -26,7 +26,9 @@ class HoneyLogger:
 
     def log(self, honeypot_type, source_ip, source_port, event_type, details=None):
         event = {
-            "timestamp": datetime.now().isoformat(),
+            # UTC + offset so the Sentinel can compute event age regardless of
+            # what timezone the consuming host (the Pi) is set to.
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "honeypot": honeypot_type,
             "source_ip": source_ip,
             "source_port": source_port,

@@ -24,8 +24,15 @@ import os
 import sys
 import ssl
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
+from urllib.parse import urlsplit, urlunsplit
+
+
+def _status_url(webhook_url):
+    """Derive the /status endpoint from the milestone webhook URL."""
+    return urlunsplit(urlsplit(webhook_url)._replace(path="/status"))
 
 
 def fail(msg, code=2):
@@ -54,13 +61,16 @@ def summarize(events):
     unique_ips = set()
     by_event = Counter()
     by_hp = Counter()
+    ip_counts = Counter()
     coordinated = 0
     creds = Counter()
+    last_event_ts = None
     for e in events:
         ip = e.get("source_ip")
         # Don't count the synthetic SYSTEM rows toward attacker IPs
         if ip and e.get("honeypot") != "SYSTEM":
             unique_ips.add(ip)
+            ip_counts[ip] += 1
         et = e.get("event_type", "?")
         by_event[et] += 1
         by_hp[e.get("honeypot", "?")] += 1
@@ -69,12 +79,18 @@ def summarize(events):
         d = e.get("details") or {}
         if "username" in d and "password" in d:
             creds[f"{d['username']}:{d['password']}"] += 1
+        ts = e.get("timestamp")
+        if ts and (last_event_ts is None or ts > last_event_ts):
+            last_event_ts = ts
     return {
         "total_events": len(events),
         "unique_ips": len(unique_ips),
         "coordinated_scans": coordinated,
         "by_honeypot": dict(by_hp),
-        "top_creds": creds.most_common(5),
+        "by_event_type": dict(by_event),
+        "top_creds": creds.most_common(10),
+        "top_ips": ip_counts.most_common(100),
+        "last_event_ts": last_event_ts,
     }
 
 
@@ -128,6 +144,30 @@ def main():
     if not events:
         return  # nothing logged yet
     s = summarize(events)
+
+    # --- Always send a status heartbeat so the dashboard can show liveness ---
+    status_url = os.environ.get("SENTINEL_STATUS_URL") or _status_url(url)
+    heartbeat = {
+        "type": "status",
+        "source": "honeynet",
+        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "stats": {
+            "total_events": s["total_events"],
+            "unique_ips": s["unique_ips"],
+            "coordinated_scans": s["coordinated_scans"],
+            "by_honeypot": s["by_honeypot"],
+            "by_event_type": s["by_event_type"],
+            "top_credentials": s["top_creds"],
+            "top_ips": s["top_ips"],
+            "last_event_ts": s["last_event_ts"],
+        },
+    }
+    try:
+        st = post(status_url, token, heartbeat)
+        print(f"[writeup-watch] sent status heartbeat -> HTTP {st}")
+    except Exception as e:
+        print(f"[writeup-watch] heartbeat send failed: {e}", file=sys.stderr)
+
     state = load_state(state_file)
     fired = set(state.get("fired", []))
 
