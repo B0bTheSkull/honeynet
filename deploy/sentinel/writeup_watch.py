@@ -19,6 +19,7 @@ Config comes from environment (loaded by systemd from /etc/honeynet-sentinel.env
 Exit codes: 0 normal (sent or nothing to do), 2 config error. Network/log
 errors are logged to stderr and exit 0 so the timer keeps running.
 """
+import ipaddress
 import json
 import os
 import sys
@@ -57,6 +58,18 @@ def load_events(log_path):
     return events
 
 
+def _is_external(ip):
+    """True unless ip is internal/self-test traffic we shouldn't count as an
+    attacker: tailnet (100.64/10 CGNAT), private, loopback, etc. A missing or
+    unparseable IP is kept (don't silently drop synthetic/system rows)."""
+    if not ip:
+        return True
+    try:
+        return ipaddress.ip_address(ip).is_global
+    except ValueError:
+        return True
+
+
 def summarize(events):
     unique_ips = set()
     by_event = Counter()
@@ -65,8 +78,16 @@ def summarize(events):
     coordinated = 0
     creds = Counter()
     last_event_ts = None
+    total_events = 0
+    skipped_internal = 0
     for e in events:
         ip = e.get("source_ip")
+        # Drop our own tailnet/self-test traffic so the dashboard reflects real
+        # external attackers only. The raw log keeps everything for forensics.
+        if not _is_external(ip):
+            skipped_internal += 1
+            continue
+        total_events += 1
         # Don't count the synthetic SYSTEM rows toward attacker IPs
         if ip and e.get("honeypot") != "SYSTEM":
             unique_ips.add(ip)
@@ -82,8 +103,11 @@ def summarize(events):
         ts = e.get("timestamp")
         if ts and (last_event_ts is None or ts > last_event_ts):
             last_event_ts = ts
+    if skipped_internal:
+        print(f"[writeup-watch] excluded {skipped_internal} internal/self-test "
+              f"event(s) from the stats", file=sys.stderr)
     return {
-        "total_events": len(events),
+        "total_events": total_events,
         "unique_ips": len(unique_ips),
         "coordinated_scans": coordinated,
         "by_honeypot": dict(by_hp),
